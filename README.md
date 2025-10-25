@@ -61,6 +61,17 @@ The BigQuery MCP server supports multiple authentication methods:
 3. **Workload Identity Federation** (For GCP environments):
    - Configure workload identity federation in Google Cloud
 
+## Security
+
+This project implements several security measures to protect sensitive information:
+
+1. **Environment Variables**: All sensitive configuration is stored in environment variables rather than hardcoded
+2. **Git Ignore**: Sensitive files like `.env` and Python cache files are excluded from version control
+3. **API Key Protection**: The Google API Key is only used locally and never committed to the repository
+4. **Credential Management**: Service account keys are referenced via file paths and not stored in the codebase
+
+**Important**: Never commit sensitive files like `.env` containing API keys or credentials to version control. Always use the `.env.example` template instead.
+
 ## Environment Variables
 
 The following environment variables can be configured in the `.env` file:
