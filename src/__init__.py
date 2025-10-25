@@ -1,0 +1,3 @@
+"""
+BigQuery MCP Server Package
+"""
