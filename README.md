@@ -1,24 +1,96 @@
-# BigQuery MCP Server
+# BigQuery MCP SQL Generator
 
-This project implements a Model Context Protocol (MCP) server for Google BigQuery using Google ADK and FastMCP. It provides tools for AI agents to interact with BigQuery datasets.
+This project implements a Model Context Protocol (MCP) server for Google BigQuery using Google ADK and FastMCP. It provides an intelligent AI-powered system that translates natural language queries into SQL commands for BigQuery datasets, enabling non-technical users to analyze data without writing SQL.
 
-## Features
+## Table of Contents
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Components](#components)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Authentication](#authentication)
+- [Environment Variables](#environment-variables)
+- [Usage](#usage)
+  - [Starting the MCP Server](#starting-the-mcp-server)
+  - [Running the ADK Agent](#running-the-adk-agent)
+  - [Starting the Streamlit UI](#starting-the-streamlit-ui)
+  - [Starting All Components](#starting-all-components)
+- [Testing](#testing)
+- [Tools Provided](#tools-provided)
+- [Security](#security)
+- [Development](#development)
 
-- List BigQuery datasets in a project
-- Get metadata about specific datasets
-- List tables within a dataset
-- Get metadata about specific tables
-- Execute SQL queries against BigQuery
-- HTTP-based streaming protocol instead of stdio
-- Integration with Google ADK agents
-- **Intelligent LLM-powered natural language processing** for automatic query generation
-- Streamlit UI for natural language interaction
+## Overview
+
+The BigQuery MCP SQL Generator is an AI-powered application that bridges natural language processing with BigQuery data analysis. Users can ask questions about their data in plain English, and the system automatically generates and executes appropriate SQL queries to retrieve relevant information.
+
+Key features include:
+- Natural language to SQL translation using Google's Gemini LLM
+- Secure access to BigQuery datasets
+- Real-time data analysis through a web interface
+- Modular architecture with clear separation of concerns
+- Comprehensive testing suite for reliability
+
+## Architecture
+
+The application follows a three-tier microservices architecture:
+
+```
+┌─────────────────┐    HTTP/SSE    ┌──────────────────┐    BigQuery API   ┌─────────────────┐
+│   Streamlit UI  │◄──────────────►│   ADK Agent      │◄─────────────────►│  Google Cloud   │
+│ (User Interface)│               │ (LLM Processing) │                  │   BigQuery      │
+└─────────────────┘               └──────────────────┘                  └─────────────────┘
+                                            │                                    │
+                                            │ HTTP/SSE                           │
+                                            ▼                                    │
+                                  ┌──────────────────┐                         │
+                                  │   MCP Server     │◄────────────────────────┘
+                                  │ (Data Access)    │
+                                  └──────────────────┘
+```
+
+1. **Streamlit UI**: Web interface for natural language interaction
+2. **ADK Agent**: Google ADK-powered agent that processes natural language and decides which tools to use
+3. **MCP Server**: FastMCP server that provides direct access to BigQuery datasets and executes SQL queries
+4. **Google Cloud BigQuery**: Data storage and analytics platform
+
+## Components
+
+### 1. MCP Server (`src/mcp_server.py`)
+The Model Context Protocol server is built using FastMCP and provides direct access to BigQuery datasets. It exposes several tools:
+- `list_dataset_ids`: Lists all BigQuery datasets in the project
+- `get_dataset_info`: Gets metadata about a specific dataset
+- `list_table_ids`: Lists all tables in a dataset
+- `get_table_info`: Gets metadata about a specific table
+- `execute_sql`: Executes a SQL query against BigQuery
+
+The server uses HTTP streaming protocol with Server-Sent Events (SSE) for real-time communication.
+
+### 2. ADK Agent (`src/adk_agent.py`)
+The Google ADK agent acts as middleware between the user interface and the MCP server. It:
+- Receives natural language queries from the UI
+- Uses Google's Gemini LLM to interpret queries and determine appropriate actions
+- Decides which MCP tools to use based on the query
+- Formats and executes tool calls
+- Processes results and generates human-readable responses
+
+### 3. Streamlit UI (`src/streamlit_ui.py`)
+A web-based user interface built with Streamlit that allows users to:
+- Enter natural language queries about their data
+- View conversation history
+- See formatted results from the data analysis
+
+### 4. Configuration (`src/config.py`)
+Centralized configuration management that loads all environment variables and provides them to all components.
+
+### 5. Main Application (`src/main.py`)
+Entry point for the application that can start individual components or the entire system.
 
 ## Prerequisites
 
 - Python 3.8+
 - Google Cloud Project with BigQuery API enabled
-- Service Account with BigQuery permissions
+- Service Account with BigQuery permissions (for production use)
 
 ## Setup
 
@@ -60,17 +132,6 @@ The BigQuery MCP server supports multiple authentication methods:
 
 3. **Workload Identity Federation** (For GCP environments):
    - Configure workload identity federation in Google Cloud
-
-## Security
-
-This project implements several security measures to protect sensitive information:
-
-1. **Environment Variables**: All sensitive configuration is stored in environment variables rather than hardcoded
-2. **Git Ignore**: Sensitive files like `.env` and Python cache files are excluded from version control
-3. **API Key Protection**: The Google API Key is only used locally and never committed to the repository
-4. **Credential Management**: Service account keys are referenced via file paths and not stored in the codebase
-
-**Important**: Never commit sensitive files like `.env` containing API keys or credentials to version control. Always use the `.env.example` template instead.
 
 ## Environment Variables
 
@@ -206,6 +267,17 @@ MCPToolset(
     )
 )
 ```
+
+## Security
+
+This project implements several security measures to protect sensitive information:
+
+1. **Environment Variables**: All sensitive configuration is stored in environment variables rather than hardcoded
+2. **Git Ignore**: Sensitive files like `.env` and Python cache files are excluded from version control
+3. **API Key Protection**: The Google API Key is only used locally and never committed to the repository
+4. **Credential Management**: Service account keys are referenced via file paths and not stored in the codebase
+
+**Important**: Never commit sensitive files like `.env` containing API keys or credentials to version control. Always use the `.env.example` template instead.
 
 ## Development
 
