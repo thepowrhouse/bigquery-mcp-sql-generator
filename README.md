@@ -12,9 +12,10 @@ This project implements a Model Context Protocol (MCP) server for Google BigQuer
 - [Environment Variables](#environment-variables)
 - [Usage](#usage)
   - [Starting the MCP Server](#starting-the-mcp-server)
-  - [Running the ADK Agent](#running-the-adk-agent)
+  - [Running the SQL Agent](#running-the-sql-agent)
   - [Starting the Streamlit UI](#starting-the-streamlit-ui)
   - [Starting All Components](#starting-all-components)
+- [Docker Deployment](#docker-deployment)
 - [Testing](#testing)
 - [Tools Provided](#tools-provided)
 - [Security](#security)
@@ -30,16 +31,17 @@ Key features include:
 - Real-time data analysis through a web interface
 - Modular architecture with clear separation of concerns
 - Comprehensive testing suite for reliability
+- Enhanced reasoning capabilities with the Planning Agent
 
 ## Architecture
 
-The application follows a three-tier microservices architecture:
+The application follows a four-tier microservices architecture:
 
 ```
-┌─────────────────┐    HTTP/SSE    ┌──────────────────┐    BigQuery API   ┌─────────────────┐
-│   Streamlit UI  │◄──────────────►│   ADK Agent      │◄─────────────────►│  Google Cloud   │
-│ (User Interface)│               │ (LLM Processing) │                  │   BigQuery      │
-└─────────────────┘               └──────────────────┘                  └─────────────────┘
+┌─────────────────┐    HTTP/SSE    ┌──────────────────┐    HTTP/SSE    ┌──────────────────┐    BigQuery API   ┌─────────────────┐
+│   Streamlit UI  │◄──────────────►│  Planning Agent  │◄──────────────►│   SQL Agent      │◄─────────────────►│  Google Cloud   │
+│ (User Interface)│               │ (Orchestration)  │               │ (Query Gen/Exec) │                  │   BigQuery      │
+└─────────────────┘               └──────────────────┘               └──────────────────┘                  └─────────────────┘
                                             │                                    │
                                             │ HTTP/SSE                           │
                                             ▼                                    │
@@ -50,9 +52,10 @@ The application follows a three-tier microservices architecture:
 ```
 
 1. **Streamlit UI**: Web interface for natural language interaction
-2. **ADK Agent**: Google ADK-powered agent that processes natural language and decides which tools to use
-3. **MCP Server**: FastMCP server that provides direct access to BigQuery datasets and executes SQL queries
-4. **Google Cloud BigQuery**: Data storage and analytics platform
+2. **Planning Agent**: Orchestrates the SQL agent and adds intelligent reasoning
+3. **SQL Agent** (`src/adk_agent.py`): Generates and executes SQL queries via the MCP server
+4. **MCP Server**: FastMCP server that provides direct access to BigQuery datasets and executes SQL queries
+5. **Google Cloud BigQuery**: Data storage and analytics platform
 
 ## Components
 
@@ -66,24 +69,32 @@ The Model Context Protocol server is built using FastMCP and provides direct acc
 
 The server uses HTTP streaming protocol with Server-Sent Events (SSE) for real-time communication.
 
-### 2. ADK Agent (`src/adk_agent.py`)
-The Google ADK agent acts as middleware between the user interface and the MCP server. It:
-- Receives natural language queries from the UI
-- Uses Google's Gemini LLM to interpret queries and determine appropriate actions
-- Decides which MCP tools to use based on the query
+### 2. SQL Agent (`src/adk_agent.py`)
+The SQL Agent focuses purely on generating and executing SQL queries. It:
+- Receives structured requests from the Planning Agent
+- Uses Google's Gemini LLM to generate appropriate SQL queries
+- Decides which MCP tools to use based on the request
 - Formats and executes tool calls
-- Processes results and generates human-readable responses
+- Processes results and generates structured responses
 
-### 3. Streamlit UI (`src/streamlit_ui.py`)
+### 3. Planning Agent (`src/planning_agent.py`)
+The Planning Agent orchestrates the SQL Agent and adds intelligent reasoning:
+- Analyzes user queries to determine complexity
+- Routes simple queries directly to the SQL Agent
+- Enhances complex queries with additional reasoning and analysis
+- Combines SQL results with business insights
+- Provides a more sophisticated user experience
+
+### 4. Streamlit UI (`src/streamlit_ui.py`)
 A web-based user interface built with Streamlit that allows users to:
 - Enter natural language queries about their data
 - View conversation history
-- See formatted results from the data analysis
+- See formatted results and enhanced analysis from the Planning Agent
 
-### 4. Configuration (`src/config.py`)
+### 5. Configuration (`src/config.py`)
 Centralized configuration management that loads all environment variables and provides them to all components.
 
-### 5. Main Application (`src/main.py`)
+### 6. Main Application (`src/main.py`)
 Entry point for the application that can start individual components or the entire system.
 
 ## Prerequisites
@@ -162,9 +173,9 @@ python src/main.py server
 
 The server will start and listen for HTTP connections on `http://localhost:8000`.
 
-### Running the ADK Agent
+### Running the SQL Agent
 
-Run the ADK agent that connects to the MCP server:
+Run the SQL agent that connects to the MCP server:
 ```bash
 python src/adk_agent.py "Your question here"
 ```
@@ -197,6 +208,43 @@ Note: You can also start components individually:
 python src/main.py server  # Start MCP server
 python src/main.py ui      # Start Streamlit UI
 ```
+
+## Docker Deployment
+
+The MCP server can be deployed as a Docker container for easier deployment and scaling.
+
+### Docker Files
+
+- `Dockerfile.mcp`: Dockerfile for the MCP server
+- `docker-compose.mcp.yml`: Docker Compose file for easy deployment
+- `start_mcp_docker.sh`: Shell script to build and run the container
+- `check_mcp_health.py`: Health check script
+
+### Building the Docker Image
+
+```bash
+docker build -f Dockerfile.mcp -t bigquery-mcp-server .
+```
+
+### Running with Docker
+
+```bash
+docker run -p 8000:8000 \
+  -e PROJECT_ID=your-project-id \
+  -e DATASET_ID=your-dataset-id \
+  -e TABLE_ID=your-table-id \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json \
+  -v /path/to/your/credentials.json:/app/credentials.json:ro \
+  bigquery-mcp-server
+```
+
+### Running with Docker Compose
+
+```bash
+docker-compose -f docker-compose.mcp.yml up
+```
+
+See `DOCKER_INSTRUCTIONS.md` for detailed deployment instructions.
 
 ## Testing
 

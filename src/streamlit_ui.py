@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Streamlit UI for interacting with the BigQuery ADK Agent
+Streamlit UI for interacting with the BigQuery Planning Agent
 """
 
 import os
@@ -15,8 +15,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 # Load environment variables
 load_dotenv()
 
-# Import the ADK agent
-from src.adk_agent import run_agent
+# Import the Planning agent
+from src.planning_agent import run_planning_agent
 
 # Load configuration from centralized config module
 from src.config import (
@@ -60,9 +60,9 @@ if prompt := st.chat_input("Ask a question about your BigQuery data..."):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         
-        # Run the ADK agent to get the response
+        # Run the Planning agent to get the response
         try:
-            full_response = asyncio.run(run_agent(prompt))
+            full_response = asyncio.run(run_planning_agent(prompt))
         except Exception as e:
             full_response = f"Error running agent: {str(e)}"
         
@@ -75,7 +75,7 @@ if prompt := st.chat_input("Ask a question about your BigQuery data..."):
 with st.sidebar:
     st.header("About")
     st.markdown(f"""
-    **Agent Name:** {ADK_AGENT_NAME}
+    **Agent Name:** Planning Agent
     **MCP Server:** http://{MCP_HOST}:{MCP_PORT}
     **Status:** Connected ✅
     
@@ -85,6 +85,7 @@ with st.sidebar:
     - List tables in datasets
     - Get table information
     - Execute SQL queries
+    - Enhanced analysis with reasoning
     
     ## How to Use
     Ask questions like:
@@ -92,6 +93,8 @@ with st.sidebar:
     - "Tell me about the {DATASET_ID} dataset"
     - "What tables are in the {DATASET_ID} dataset?"
     - "Show me the first 10 rows of the {TABLE_ID} table"
+    - "Analyze the sector distribution in my data"
+    - "Compare different industries in my dataset"
     """)
     
     st.divider()
