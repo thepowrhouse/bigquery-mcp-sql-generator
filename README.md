@@ -37,18 +37,25 @@ Key features include:
 
 The application follows a four-tier microservices architecture:
 
-```
-┌─────────────────┐    HTTP/SSE    ┌──────────────────┐    HTTP/SSE    ┌──────────────────┐    BigQuery API   ┌─────────────────┐
-│   Streamlit UI  │◄──────────────►│  Planning Agent  │◄──────────────►│   SQL Agent      │◄─────────────────►│  Google Cloud   │
-│ (User Interface)│               │ (Orchestration)  │               │ (Query Gen/Exec) │                  │   BigQuery      │
-└─────────────────┘               └──────────────────┘               └──────────────────┘                  └─────────────────┘
-                                            │                                    │
-                                            │ HTTP/SSE                           │
-                                            ▼                                    │
-                                  ┌──────────────────┐                         │
-                                  │   MCP Server     │◄────────────────────────┘
-                                  │ (Data Access)    │
-                                  └──────────────────┘
+```mermaid
+graph TD
+    A[Streamlit UI] <-- HTTP/SSE --> B(Planning Agent)
+    B <-- HTTP/SSE --> C[SQL Agent]
+    C <-- BigQuery API --> D[(Google Cloud BigQuery)]
+    C <-- HTTP/SSE --> E[MCP Server]
+    E <-- BigQuery API --> D
+
+    style A fill:#FFE4B5,stroke:#333
+    style B fill:#98FB98,stroke:#333
+    style C fill:#87CEEB,stroke:#333
+    style E fill:#FFB6C1,stroke:#333
+    style D fill:#DDA0DD,stroke:#333
+
+    linkStyle 0 stroke:#6495ED,stroke-width:2px
+    linkStyle 1 stroke:#6495ED,stroke-width:2px
+    linkStyle 2 stroke:#32CD32,stroke-width:2px
+    linkStyle 3 stroke:#FFA500,stroke-width:2px
+    linkStyle 4 stroke:#FFA500,stroke-width:2px
 ```
 
 1. **Streamlit UI**: Web interface for natural language interaction
@@ -215,20 +222,23 @@ The MCP server can be deployed as a Docker container for easier deployment and s
 
 ### Docker Files
 
-- `Dockerfile.mcp`: Dockerfile for the MCP server
-- `docker-compose.mcp.yml`: Docker Compose file for easy deployment
-- `start_mcp_docker.sh`: Shell script to build and run the container
-- `check_mcp_health.py`: Health check script
+All Docker-related files are located in the [docker/](file:///Users/sujitdeshpande/Desktop/dev/bigquery-mcp-python/docker/) directory:
+- `docker/Dockerfile.mcp`: Dockerfile for the MCP server
+- `docker/docker-compose.mcp.yml`: Docker Compose file for easy deployment
+- `docker/start_mcp_docker.sh`: Shell script to build and run the container
+- `docker/DOCKER_INSTRUCTIONS.md`: Detailed deployment instructions
 
 ### Building the Docker Image
 
 ```bash
+cd docker
 docker build -f Dockerfile.mcp -t bigquery-mcp-server .
 ```
 
 ### Running with Docker
 
 ```bash
+cd docker
 docker run -p 8000:8000 \
   -e PROJECT_ID=your-project-id \
   -e DATASET_ID=your-dataset-id \
@@ -241,10 +251,11 @@ docker run -p 8000:8000 \
 ### Running with Docker Compose
 
 ```bash
+cd docker
 docker-compose -f docker-compose.mcp.yml up
 ```
 
-See `DOCKER_INSTRUCTIONS.md` for detailed deployment instructions.
+See `docker/DOCKER_INSTRUCTIONS.md` for detailed deployment instructions.
 
 ## Testing
 

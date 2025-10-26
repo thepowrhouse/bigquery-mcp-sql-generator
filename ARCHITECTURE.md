@@ -19,7 +19,6 @@ The original architecture has been enhanced to include a Planning Agent that act
   - Present a web interface for natural language queries
   - Display conversation history
   - Show formatted responses from the Planning Agent
-  - Handle user input and output presentation
 
 ### 2. Planning Agent (`src/planning_agent.py`)
 - **Responsibility**: Orchestration and enhanced reasoning
@@ -47,6 +46,30 @@ The original architecture has been enhanced to include a Planning Agent that act
   - Return structured data responses
 
 ## Data Flow
+
+### System Architecture
+The application follows a four-tier microservices architecture:
+
+```mermaid
+graph TD
+    A[Streamlit UI] <-- HTTP/SSE --> B(Planning Agent)
+    B <-- HTTP/SSE --> C[SQL Agent]
+    C <-- BigQuery API --> D[(Google Cloud BigQuery)]
+    C <-- HTTP/SSE --> E[MCP Server]
+    E <-- BigQuery API --> D
+
+    style A fill:#FFE4B5,stroke:#333
+    style B fill:#98FB98,stroke:#333
+    style C fill:#87CEEB,stroke:#333
+    style E fill:#FFB6C1,stroke:#333
+    style D fill:#DDA0DD,stroke:#333
+
+    linkStyle 0 stroke:#6495ED,stroke-width:2px
+    linkStyle 1 stroke:#6495ED,stroke-width:2px
+    linkStyle 2 stroke:#32CD32,stroke-width:2px
+    linkStyle 3 stroke:#FFA500,stroke-width:2px
+    linkStyle 4 stroke:#FFA500,stroke-width:2px
+```
 
 ### Simple Query Flow
 1. User enters a simple query in the Streamlit UI (e.g., "What datasets do I have?")
