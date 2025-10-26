@@ -28,6 +28,20 @@ from src.config import (
 # Import the BigQuery client from our MCP server
 from src.mcp_server import bq_client
 
+# Try to import Google GenAI
+GOOGLE_GENAI_AVAILABLE = False
+configure = None
+GenerativeModel = None
+
+# Try importing the specific functions we need from the correct modules
+try:
+    from google.generativeai.client import configure
+    from google.generativeai.generative_models import GenerativeModel
+    GOOGLE_GENAI_AVAILABLE = True
+    print("Google Generative AI is available")
+except ImportError:
+    print("Google Generative AI not available")
+
 # Define the tools available to the agent
 TOOLS_DESCRIPTION = f"""
 Available BigQuery Tools:
@@ -132,16 +146,13 @@ async def run_agent(prompt: str):
     
     try:
         # If Google API key is available, use the LLM to decide what tools to use
-        if GOOGLE_API_KEY:
+        if GOOGLE_API_KEY and GOOGLE_GENAI_AVAILABLE and configure is not None and GenerativeModel is not None:
             try:
-                # Import Google GenAI
-                import google.generativeai as genai
-                
                 # Configure Google GenAI
-                genai.configure(api_key=GOOGLE_API_KEY)
+                configure(api_key=GOOGLE_API_KEY)
                 
                 # Create the model
-                model = genai.GenerativeModel('gemini-2.5-flash')
+                model = GenerativeModel('gemini-2.5-flash')
                 
                 # Create the prompt with tool descriptions
                 full_prompt = f"""
@@ -179,6 +190,7 @@ CRITICAL INSTRUCTIONS:
 4. For stock-related questions, remember that the {TABLE_ID} table contains stock data
 5. Use proper BigQuery syntax with backticks for table names: `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}`
 6. For filtering queries, use appropriate WHERE clauses to get exactly what the user is asking for
+7. ONLY generate the SQL query, do not provide analysis or interpretation - that will be handled by the Planning Agent
 
 Respond ONLY with a JSON object in this format:
 {{
@@ -263,96 +275,17 @@ Examples:
                     
                     # If we have results, format them nicely
                     if results:
-                        # Enhanced handling for analytical/summary questions
-                        analysis_keywords = ["analyse", "analyze", "analysis", "understand", "summary", "summarize", "nature", "explain", "insight", "provide", "find", "different", "compare", "trend", "pattern"]
-                        is_analysis_query = any(keyword in prompt.lower() for keyword in analysis_keywords)
-                        
-                        if is_analysis_query:
-                            # For analytical queries, we want to provide insights, not just raw data
-                            response = f"## Analysis Results\n\n"
-                            
-                            # Process table info if available
-                            table_info = None
-                            query_results = None
-                            
-                            for r in results:
-                                if r['tool'] == 'get_table_info':
-                                    table_info = r['result']
-                                    query_results = r['result']  # For table info, use the result directly
-                                elif r['tool'] == 'execute_sql':
-                                    query_results = r['result']
-                            
-                            # Provide insights based on the query results
-                            if query_results and isinstance(query_results, list) and len(query_results) > 0:
-                                # Check if this is a list of dictionaries (successful query result)
-                                if isinstance(query_results[0], dict) and 'error' not in query_results[0]:
-                                    # Check if this is a sector analysis query
-                                    if 'sector' in prompt.lower() and any('Sector' in str(key) for key in query_results[0].keys()):
-                                        response += "**Sector Analysis:**\n\n"
-                                        response += "This query reveals the different industrial sectors represented in the IndianAPI dataset.\n\n"
-                                        
-                                        # Show all sectors found
-                                        response += f"**Total sectors identified**: {len(query_results)}\n\n"
-                                        
-                                        response += "**Sector List:**\n"
-                                        for i, sector_data in enumerate(query_results[:10], 1):  # Show top 10
-                                            sector_name = sector_data.get('Sector', 'Unknown')
-                                            response += f"{i}. {sector_name}\n"
-                                        
-                                        if len(query_results) > 10:
-                                            response += f"... and {len(query_results) - 10} more sectors\n\n"
-                                        
-                                        response += "**Analysis Observations:**\n"
-                                        response += "- The dataset covers a diverse range of industrial sectors\n"
-                                        response += "- Major sectors include Industrials, Technology, and Basic Materials\n"
-                                        response += "- Sector diversity indicates comprehensive market coverage\n\n"
-                                        
-                                        response += "**Recommended Actions:**\n"
-                                        response += "- Analyze sector distribution and representation\n"
-                                        response += "- Compare performance across different sectors\n"
-                                        response += "- Identify sector-specific investment opportunities\n\n"
-                                    else:
-                                        # Generic analysis for other queries
-                                        response += "**Query Results:**\n\n"
-                                        table_output = format_sql_results_as_table(query_results)
-                                        response += table_output
-                                        response += "\n\n"
-                                else:
-                                    # Handle error case
-                                    response += "Unable to retrieve query results for detailed analysis.\n\n"
-                            elif query_results and isinstance(query_results, dict) and 'table_id' in query_results:
-                                # Handle table info results
-                                response += "**Table Summary:**\n\n"
-                                response += f"- **Table Name**: {query_results.get('table_id', 'Unknown')}\n"
-                                response += f"- **Number of Rows**: {query_results.get('num_rows', 'Unknown')}\n"
-                                response += f"- **Number of Columns**: {query_results.get('num_columns', 'Unknown')}\n\n"
-                                
-                                response += "**Table Characteristics:**\n"
-                                response += "This table contains Indian stock market data with comprehensive financial and technical analysis information.\n\n"
-                                
-                                response += "**Data Structure:**\n"
-                                response += "- Stock identification information (tickers, company names)\n"
-                                response += "- Sector and industry classifications\n"
-                                response += "- Technical trading indicators and recommendations\n"
-                                response += "- Price data and performance metrics\n\n"
+                        # Regular formatting for all queries - let the Planning Agent handle analysis
+                        formatted_results = []
+                        for r in results:
+                            if r['tool'] == 'execute_sql':
+                                # Format SQL results as a table
+                                table_output = format_sql_results_as_table(r['result'])
+                                formatted_results.append(f"{r['tool']}:\n{table_output}")
                             else:
-                                response += "No data found for the requested analysis.\n\n"
-                            
-                            return response
-                            
-                            return response
-                        else:
-                            # Regular formatting for other queries
-                            formatted_results = []
-                            for r in results:
-                                if r['tool'] == 'execute_sql':
-                                    # Format SQL results as a table
-                                    table_output = format_sql_results_as_table(r['result'])
-                                    formatted_results.append(f"{r['tool']}:\n{table_output}")
-                                else:
-                                    formatted_results.append(f"{r['tool']}: {r['result']}")
-                            
-                            return f"Based on your question, I used the following tools:\n" + "\n".join(formatted_results)
+                                formatted_results.append(f"{r['tool']}: {r['result']}")
+                        
+                        return f"Based on your question, I used the following tools:\n" + "\n".join(formatted_results)
                     else:
                         return f"I analyzed your question but didn't need to use any tools.\n\nYou asked: '{prompt}'"
                 except json.JSONDecodeError as je:
