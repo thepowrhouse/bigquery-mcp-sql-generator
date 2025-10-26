@@ -44,18 +44,24 @@ graph TD
     C <-- BigQuery API --> D[(Google Cloud BigQuery)]
     C <-- HTTP/SSE --> E[MCP Server]
     E <-- BigQuery API --> D
+    F[Gemini LLM] -.-> C
+    G[Gemini LLM] -.-> B
 
     style A fill:#FFE4B5,stroke:#333
     style B fill:#98FB98,stroke:#333
     style C fill:#87CEEB,stroke:#333
     style E fill:#FFB6C1,stroke:#333
     style D fill:#DDA0DD,stroke:#333
+    style F fill:#DDA0DD,stroke:#333,stroke-dasharray: 5 5
+    style G fill:#DDA0DD,stroke:#333,stroke-dasharray: 5 5
 
     linkStyle 0 stroke:#6495ED,stroke-width:2px
     linkStyle 1 stroke:#6495ED,stroke-width:2px
     linkStyle 2 stroke:#32CD32,stroke-width:2px
     linkStyle 3 stroke:#FFA500,stroke-width:2px
     linkStyle 4 stroke:#FFA500,stroke-width:2px
+    linkStyle 5 stroke:#9370DB,stroke-width:2px,stroke-dasharray: 5 5
+    linkStyle 6 stroke:#9370DB,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
 1. **Streamlit UI**: Web interface for natural language interaction
