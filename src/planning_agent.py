@@ -26,12 +26,18 @@ from src.config import (
 from src.adk_agent import run_agent as run_sql_agent
 
 # Try to import Google GenAI, but handle if not available
+GOOGLE_GENAI_AVAILABLE = False
+configure = None
+GenerativeModel = None
+
+# Try importing the specific functions we need
 try:
-    import google.generativeai as genai
+    from google.generativeai.client import configure
+    from google.generativeai.generative_models import GenerativeModel
     GOOGLE_GENAI_AVAILABLE = True
+    print("Google Generative AI is available for Planning Agent")
 except ImportError:
-    genai = None
-    GOOGLE_GENAI_AVAILABLE = False
+    print("Google Generative AI not available for Planning Agent")
 
 async def run_planning_agent(user_query: str):
     """
@@ -58,6 +64,7 @@ async def run_planning_agent(user_query: str):
 def _needs_complex_reasoning(query: str) -> bool:
     """
     Determine if a query needs complex reasoning based on keywords
+    Uses word boundary matching to avoid false positives
     """
     complex_keywords = [
         'analyze', 'analysis', 'compare', 'trend', 'pattern', 'insight', 
@@ -66,7 +73,14 @@ def _needs_complex_reasoning(query: str) -> bool:
     ]
     
     query_lower = query.lower()
-    return any(keyword in query_lower for keyword in complex_keywords)
+    # Use word boundary matching to avoid false positives
+    for keyword in complex_keywords:
+        # Create a regex pattern with word boundaries
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if re.search(pattern, query_lower):
+            return True
+    
+    return False
 
 async def _handle_simple_query(user_query: str) -> str:
     """
@@ -86,7 +100,7 @@ async def _handle_complex_query(user_query: str) -> str:
     sql_response = await run_sql_agent(user_query)
     
     # Then, enhance it with reasoning if we have a Google API key and GenAI available
-    if GOOGLE_API_KEY and GOOGLE_GENAI_AVAILABLE:
+    if GOOGLE_API_KEY and GOOGLE_GENAI_AVAILABLE and configure is not None and GenerativeModel is not None:
         enhanced_response = await _add_reasoning(user_query, sql_response)
         return enhanced_response
     else:
@@ -105,14 +119,14 @@ async def _add_reasoning(original_query: str, sql_response: str) -> str:
     """
     try:
         # Only proceed if GenAI is available
-        if not GOOGLE_GENAI_AVAILABLE:
+        if not GOOGLE_GENAI_AVAILABLE or configure is None or GenerativeModel is None:
             return sql_response
             
         # Configure Google GenAI
-        genai.configure(api_key=GOOGLE_API_KEY)
+        configure(api_key=GOOGLE_API_KEY)
         
         # Create the model
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = GenerativeModel('gemini-2.5-flash')
         
         # Create the reasoning prompt
         reasoning_prompt = f"""
