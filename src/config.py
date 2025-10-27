@@ -14,6 +14,11 @@ load_dotenv()
 ADK_MODEL = os.getenv('ADK_MODEL', 'gemini-2.5-flash')
 ADK_AGENT_NAME = os.getenv('ADK_AGENT_NAME', 'bigquery_analytics_agent')
 
+# LLM Provider Configuration
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'gemini')  # 'gemini' or 'openai'
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4-turbo')
+
 # MCP Server Configuration
 MCP_HOST = os.getenv('MCP_HOST', 'localhost')
 MCP_PORT = int(os.getenv('MCP_PORT', '8000'))

@@ -17,9 +17,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 from src.config import (
     ADK_MODEL,
     ADK_AGENT_NAME,
+    LLM_PROVIDER,
+    GOOGLE_API_KEY,
+    OPENAI_API_KEY,
+    OPENAI_MODEL,
     MCP_HOST,
     MCP_PORT,
-    GOOGLE_API_KEY,
     PROJECT_ID,
     DATASET_ID,
     TABLE_ID
@@ -27,6 +30,9 @@ from src.config import (
 
 # Import the BigQuery client from our MCP server
 from src.mcp_server import bq_client
+
+# Import LLM manager
+from src.llm_manager import generate_llm_response
 
 # Define the tools available to the agent
 TOOLS_DESCRIPTION = f"""
@@ -127,22 +133,14 @@ def format_sql_results_as_table(results):
 
 async def run_agent(prompt: str):
     """Run the agent with a given prompt using the LLM to decide what tools to use"""
+    print(f"DEBUG: LLM_PROVIDER is set: {LLM_PROVIDER}")
     print(f"DEBUG: GOOGLE_API_KEY is set: {bool(GOOGLE_API_KEY)}")
-    print(f"DEBUG: GOOGLE_API_KEY value: {GOOGLE_API_KEY[:10] if GOOGLE_API_KEY else 'None'}...")
+    print(f"DEBUG: OPENAI_API_KEY is set: {bool(OPENAI_API_KEY)}")
     
     try:
-        # If Google API key is available, use the LLM to decide what tools to use
-        if GOOGLE_API_KEY:
+        # If API key is available for the configured provider, use the LLM to decide what tools to use
+        if (LLM_PROVIDER == 'gemini' and GOOGLE_API_KEY) or (LLM_PROVIDER == 'openai' and OPENAI_API_KEY):
             try:
-                # Import Google GenAI
-                import google.generativeai as genai
-                
-                # Configure Google GenAI
-                genai.configure(api_key=GOOGLE_API_KEY)
-                
-                # Create the model
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                
                 # Create the prompt with tool descriptions
                 full_prompt = f"""
 You are a helpful AI assistant that can analyze data in Google BigQuery and answer questions about it.
@@ -205,12 +203,12 @@ Examples:
 """
                 
                 print("DEBUG: About to call LLM...")
-                # Generate the response
-                response = await model.generate_content_async(full_prompt)
-                print(f"DEBUG: LLM response received: {response}")
+                # Generate the response using our LLM manager
+                response_text = await generate_llm_response(full_prompt)
+                print(f"DEBUG: LLM response received: {response_text}")
                 
                 # Clean up the response text by removing markdown code block formatting
-                response_text = response.text.strip()
+                response_text = response_text.strip()
                 print(f"DEBUG: Raw LLM response text: {response_text}")
                 
                 # Extract JSON from response
@@ -263,96 +261,17 @@ Examples:
                     
                     # If we have results, format them nicely
                     if results:
-                        # Enhanced handling for analytical/summary questions
-                        analysis_keywords = ["analyse", "analyze", "analysis", "understand", "summary", "summarize", "nature", "explain", "insight", "provide", "find", "different", "compare", "trend", "pattern"]
-                        is_analysis_query = any(keyword in prompt.lower() for keyword in analysis_keywords)
-                        
-                        if is_analysis_query:
-                            # For analytical queries, we want to provide insights, not just raw data
-                            response = f"## Analysis Results\n\n"
-                            
-                            # Process table info if available
-                            table_info = None
-                            query_results = None
-                            
-                            for r in results:
-                                if r['tool'] == 'get_table_info':
-                                    table_info = r['result']
-                                    query_results = r['result']  # For table info, use the result directly
-                                elif r['tool'] == 'execute_sql':
-                                    query_results = r['result']
-                            
-                            # Provide insights based on the query results
-                            if query_results and isinstance(query_results, list) and len(query_results) > 0:
-                                # Check if this is a list of dictionaries (successful query result)
-                                if isinstance(query_results[0], dict) and 'error' not in query_results[0]:
-                                    # Check if this is a sector analysis query
-                                    if 'sector' in prompt.lower() and any('Sector' in str(key) for key in query_results[0].keys()):
-                                        response += "**Sector Analysis:**\n\n"
-                                        response += "This query reveals the different industrial sectors represented in the IndianAPI dataset.\n\n"
-                                        
-                                        # Show all sectors found
-                                        response += f"**Total sectors identified**: {len(query_results)}\n\n"
-                                        
-                                        response += "**Sector List:**\n"
-                                        for i, sector_data in enumerate(query_results[:10], 1):  # Show top 10
-                                            sector_name = sector_data.get('Sector', 'Unknown')
-                                            response += f"{i}. {sector_name}\n"
-                                        
-                                        if len(query_results) > 10:
-                                            response += f"... and {len(query_results) - 10} more sectors\n\n"
-                                        
-                                        response += "**Analysis Observations:**\n"
-                                        response += "- The dataset covers a diverse range of industrial sectors\n"
-                                        response += "- Major sectors include Industrials, Technology, and Basic Materials\n"
-                                        response += "- Sector diversity indicates comprehensive market coverage\n\n"
-                                        
-                                        response += "**Recommended Actions:**\n"
-                                        response += "- Analyze sector distribution and representation\n"
-                                        response += "- Compare performance across different sectors\n"
-                                        response += "- Identify sector-specific investment opportunities\n\n"
-                                    else:
-                                        # Generic analysis for other queries
-                                        response += "**Query Results:**\n\n"
-                                        table_output = format_sql_results_as_table(query_results)
-                                        response += table_output
-                                        response += "\n\n"
-                                else:
-                                    # Handle error case
-                                    response += "Unable to retrieve query results for detailed analysis.\n\n"
-                            elif query_results and isinstance(query_results, dict) and 'table_id' in query_results:
-                                # Handle table info results
-                                response += "**Table Summary:**\n\n"
-                                response += f"- **Table Name**: {query_results.get('table_id', 'Unknown')}\n"
-                                response += f"- **Number of Rows**: {query_results.get('num_rows', 'Unknown')}\n"
-                                response += f"- **Number of Columns**: {query_results.get('num_columns', 'Unknown')}\n\n"
-                                
-                                response += "**Table Characteristics:**\n"
-                                response += "This table contains Indian stock market data with comprehensive financial and technical analysis information.\n\n"
-                                
-                                response += "**Data Structure:**\n"
-                                response += "- Stock identification information (tickers, company names)\n"
-                                response += "- Sector and industry classifications\n"
-                                response += "- Technical trading indicators and recommendations\n"
-                                response += "- Price data and performance metrics\n\n"
+                        # Regular formatting for all queries - let the Planning Agent handle analysis
+                        formatted_results = []
+                        for r in results:
+                            if r['tool'] == 'execute_sql':
+                                # Format SQL results as a table
+                                table_output = format_sql_results_as_table(r['result'])
+                                formatted_results.append(f"{r['tool']}:\n{table_output}")
                             else:
-                                response += "No data found for the requested analysis.\n\n"
-                            
-                            return response
-                            
-                            return response
-                        else:
-                            # Regular formatting for other queries
-                            formatted_results = []
-                            for r in results:
-                                if r['tool'] == 'execute_sql':
-                                    # Format SQL results as a table
-                                    table_output = format_sql_results_as_table(r['result'])
-                                    formatted_results.append(f"{r['tool']}:\n{table_output}")
-                                else:
-                                    formatted_results.append(f"{r['tool']}: {r['result']}")
-                            
-                            return f"Based on your question, I used the following tools:\n" + "\n".join(formatted_results)
+                                formatted_results.append(f"{r['tool']}: {r['result']}")
+                        
+                        return f"Based on your question, I used the following tools:\n" + "\n".join(formatted_results)
                     else:
                         return f"I analyzed your question but didn't need to use any tools.\n\nYou asked: '{prompt}'"
                 except json.JSONDecodeError as je:
@@ -365,7 +284,7 @@ Examples:
                 traceback.print_exc()
                 pass
         
-        # If no Google API key is configured or LLM fails, provide a minimal fallback
+        # If no API key is configured or LLM fails, provide a minimal fallback
         # that encourages using the LLM path
         prompt_lower = prompt.lower()
         
@@ -386,7 +305,7 @@ Examples:
             # Provide basic help
             return f"""I'm an AI agent connected to your BigQuery data through an MCP server. 
 I can help you explore your data in the {DATASET_ID} dataset, specifically the {TABLE_ID} table.
-For best results, please configure your GOOGLE_API_KEY in the .env file to enable full LLM-powered analysis.
+For best results, please configure your API key in the .env file to enable full LLM-powered analysis.
 Try asking questions like:
 - 'What datasets do I have?'
 - 'Show me the first 10 rows of data'
@@ -398,7 +317,7 @@ You asked: '{prompt}'"""
         else:
             # For all other queries, encourage setting up the LLM
             return f"""For more intelligent analysis of your query: '{prompt}', 
-please configure your GOOGLE_API_KEY in the .env file. 
+please configure your API key in the .env file. 
 This will enable the LLM to understand your question and generate appropriate SQL queries.
 Currently, I can help with basic dataset listing. For advanced analysis, LLM configuration is required."""
     except Exception as e:
@@ -413,4 +332,4 @@ if __name__ == "__main__":
         print(f"BigQuery ADK Agent ({ADK_AGENT_NAME}) using {ADK_MODEL}")
         print(f"Connected to MCP Server at http://{MCP_HOST}:{MCP_PORT}")
         print("Usage: python adk_agent.py 'Your question here'")
-        print("For full LLM capabilities, ensure GOOGLE_API_KEY is set in .env")
+        print("For full LLM capabilities, ensure API key is set in .env")

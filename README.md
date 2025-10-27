@@ -26,7 +26,7 @@ This project implements a Model Context Protocol (MCP) server for Google BigQuer
 The BigQuery MCP SQL Generator is an AI-powered application that bridges natural language processing with BigQuery data analysis. Users can ask questions about their data in plain English, and the system automatically generates and executes appropriate SQL queries to retrieve relevant information.
 
 Key features include:
-- Natural language to SQL translation using Google's Gemini LLM
+- Natural language to SQL translation using Google's Gemini LLM or OpenAI's GPT models
 - Secure access to BigQuery datasets
 - Real-time data analysis through a web interface
 - Modular architecture with clear separation of concerns
@@ -85,7 +85,7 @@ The server uses HTTP streaming protocol with Server-Sent Events (SSE) for real-t
 ### 2. SQL Agent (`src/adk_agent.py`)
 The SQL Agent focuses purely on generating and executing SQL queries. It:
 - Receives structured requests from the Planning Agent
-- Uses Google's Gemini LLM to generate appropriate SQL queries
+- Uses LLMs (Google's Gemini or OpenAI's GPT) to generate appropriate SQL queries
 - Decides which MCP tools to use based on the request
 - Formats and executes tool calls
 - Processes results and generates structured responses
@@ -107,7 +107,10 @@ A web-based user interface built with Streamlit that allows users to:
 ### 5. Configuration (`src/config.py`)
 Centralized configuration management that loads all environment variables and provides them to all components.
 
-### 6. Main Application (`src/main.py`)
+### 6. LLM Manager (`src/llm_manager.py`)
+Unified interface for different LLM providers that supports both Google Gemini and OpenAI models.
+
+### 7. Main Application (`src/main.py`)
 Entry point for the application that can start individual components or the entire system.
 
 ## Prerequisites
@@ -138,7 +141,7 @@ Entry point for the application that can start individual components or the enti
    Then edit the `.env` file to set your specific configuration values:
    - Set your Google Cloud Project ID
    - Set your BigQuery dataset and table names
-   - Set your Google API Key for LLM features (optional but recommended)
+   - Set your API Key for LLM features (Google or OpenAI)
    - Configure other settings as needed
 
 ## Authentication
@@ -173,7 +176,10 @@ The following environment variables can be configured in the `.env` file:
 - `ADK_AGENT_NAME`: ADK agent name (default: bigquery_analytics_agent)
 - `STREAMLIT_HOST`: Streamlit UI host (default: localhost)
 - `STREAMLIT_PORT`: Streamlit UI port (default: 8501)
-- `GOOGLE_API_KEY`: Google API Key for LLM features (required for advanced AI capabilities)
+- `LLM_PROVIDER`: LLM provider to use ('gemini' or 'openai', default: gemini)
+- `GOOGLE_API_KEY`: Google API Key for Gemini LLM features (required if using Gemini)
+- `OPENAI_API_KEY`: OpenAI API Key for GPT models (required if using OpenAI)
+- `OPENAI_MODEL`: OpenAI model to use (default: gpt-4-turbo)
 
 ## Usage
 
@@ -193,7 +199,7 @@ Run the SQL agent that connects to the MCP server:
 python src/adk_agent.py "Your question here"
 ```
 
-**Note**: For full LLM-powered capabilities, configure your `GOOGLE_API_KEY` in the `.env` file. 
+**Note**: For full LLM-powered capabilities, configure your API key in the `.env` file. 
 Without this key, the agent will only support basic functionality. With the API key configured,
 the LLM will automatically determine what tools to use and generate appropriate SQL queries
 based on your natural language questions.
@@ -339,7 +345,7 @@ This project implements several security measures to protect sensitive informati
 
 1. **Environment Variables**: All sensitive configuration is stored in environment variables rather than hardcoded
 2. **Git Ignore**: Sensitive files like `.env` and Python cache files are excluded from version control
-3. **API Key Protection**: The Google API Key is only used locally and never committed to the repository
+3. **API Key Protection**: API Keys are only used locally and never committed to the repository
 4. **Credential Management**: Service account keys are referenced via file paths and not stored in the codebase
 
 **Important**: Never commit sensitive files like `.env` containing API keys or credentials to version control. Always use the `.env.example` template instead.

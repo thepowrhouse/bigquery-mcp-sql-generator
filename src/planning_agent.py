@@ -16,7 +16,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 # Load configuration
 from src.config import (
     ADK_MODEL,
+    LLM_PROVIDER,
     GOOGLE_API_KEY,
+    OPENAI_API_KEY,
     PROJECT_ID,
     DATASET_ID,
     TABLE_ID
@@ -25,19 +27,8 @@ from src.config import (
 # Import the SQL agent (current ADK agent)
 from src.adk_agent import run_agent as run_sql_agent
 
-# Try to import Google GenAI, but handle if not available
-GOOGLE_GENAI_AVAILABLE = False
-configure = None
-GenerativeModel = None
-
-# Try importing the specific functions we need
-try:
-    from google.generativeai.client import configure
-    from google.generativeai.generative_models import GenerativeModel
-    GOOGLE_GENAI_AVAILABLE = True
-    print("Google Generative AI is available for Planning Agent")
-except ImportError:
-    print("Google Generative AI not available for Planning Agent")
+# Import LLM manager
+from src.llm_manager import generate_llm_response
 
 async def run_planning_agent(user_query: str):
     """
@@ -99,17 +90,17 @@ async def _handle_complex_query(user_query: str) -> str:
     # First, get the raw data from the SQL agent
     sql_response = await run_sql_agent(user_query)
     
-    # Then, enhance it with reasoning if we have a Google API key and GenAI available
-    if GOOGLE_API_KEY and GOOGLE_GENAI_AVAILABLE and configure is not None and GenerativeModel is not None:
+    # Then, enhance it with reasoning if we have an API key available
+    if (LLM_PROVIDER == 'gemini' and GOOGLE_API_KEY) or (LLM_PROVIDER == 'openai' and OPENAI_API_KEY):
         enhanced_response = await _add_reasoning(user_query, sql_response)
         return enhanced_response
     else:
-        # Without API key or GenAI, return the SQL response with a note
+        # Without API key, return the SQL response with a note
         note = ""
-        if not GOOGLE_API_KEY:
+        if LLM_PROVIDER == 'gemini' and not GOOGLE_API_KEY:
             note = "Note: For detailed analysis and insights, please configure your GOOGLE_API_KEY in the .env file.\n\n"
-        elif not GOOGLE_GENAI_AVAILABLE:
-            note = "Note: Google Generative AI library not available for enhanced analysis.\n\n"
+        elif LLM_PROVIDER == 'openai' and not OPENAI_API_KEY:
+            note = "Note: For detailed analysis and insights, please configure your OPENAI_API_KEY in the .env file.\n\n"
         
         return f"{note}{sql_response}"
     
@@ -118,16 +109,6 @@ async def _add_reasoning(original_query: str, sql_response: str) -> str:
     Add intelligent reasoning to the SQL response using LLM
     """
     try:
-        # Only proceed if GenAI is available
-        if not GOOGLE_GENAI_AVAILABLE or configure is None or GenerativeModel is None:
-            return sql_response
-            
-        # Configure Google GenAI
-        configure(api_key=GOOGLE_API_KEY)
-        
-        # Create the model
-        model = GenerativeModel('gemini-2.5-flash')
-        
         # Create the reasoning prompt
         reasoning_prompt = f"""
 You are an expert data analyst and business intelligence consultant. Your task is to analyze SQL query results and provide insightful, actionable interpretations.
@@ -149,15 +130,15 @@ Use markdown formatting for better readability with headers, bullet points, and 
 """
         
         print("Planning Agent: Generating reasoning with LLM...")
-        # Generate the reasoning response
-        response = await model.generate_content_async(reasoning_prompt)
+        # Generate the reasoning response using our LLM manager
+        response_text = await generate_llm_response(reasoning_prompt)
         
         # Combine the original SQL response with the enhanced reasoning
         enhanced_response = f"""## Original Response
 {sql_response}
 
 ## Enhanced Analysis
-{response.text}
+{response_text}
 """
         return enhanced_response
         
