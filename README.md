@@ -44,8 +44,8 @@ graph TD
     C <-- BigQuery API --> D[(Google Cloud BigQuery)]
     C <-- HTTP/SSE --> E[MCP Server]
     E <-- BigQuery API --> D
-    F[Gemini LLM] -.-> C
-    G[Gemini LLM] -.-> B
+    F[LLM Provider] -.-> C
+    G[LLM Provider] -.-> B
 
     style A fill:#FFE4B5,stroke:#333
     style B fill:#98FB98,stroke:#333
@@ -69,6 +69,7 @@ graph TD
 3. **SQL Agent** (`src/adk_agent.py`): Generates and executes SQL queries via the MCP server
 4. **MCP Server**: FastMCP server that provides direct access to BigQuery datasets and executes SQL queries
 5. **Google Cloud BigQuery**: Data storage and analytics platform
+6. **LLM Provider**: Can be either Google Gemini or OpenAI GPT models based on configuration
 
 ### Data Flow
 
