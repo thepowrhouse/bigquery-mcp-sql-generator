@@ -70,6 +70,34 @@ graph TD
 4. **MCP Server**: FastMCP server that provides direct access to BigQuery datasets and executes SQL queries
 5. **Google Cloud BigQuery**: Data storage and analytics platform
 
+### Data Flow
+
+#### Simple Query Flow
+1. User enters a simple query in the Streamlit UI (e.g., "What datasets do I have?")
+2. Streamlit UI sends the query to the Planning Agent
+3. Planning Agent identifies it as a simple query
+4. Planning Agent routes the query directly to the SQL Agent
+5. SQL Agent generates and executes the appropriate SQL query via the MCP Server
+6. SQL Agent returns the results to the Planning Agent
+7. Planning Agent relays the results back to the Streamlit UI
+8. Streamlit UI displays the results to the user
+
+#### Complex Query Flow
+1. User enters a complex query in the Streamlit UI (e.g., "Analyze the sector distribution in my data")
+2. Streamlit UI sends the query to the Planning Agent
+3. Planning Agent identifies it as a complex query requiring reasoning
+4. Planning Agent sends the query to the SQL Agent
+5. SQL Agent generates and executes the appropriate SQL query via the MCP Server
+6. SQL Agent returns the raw data to the Planning Agent
+7. Planning Agent enhances the results with additional reasoning and analysis
+8. Planning Agent returns the enhanced results to the Streamlit UI
+9. Streamlit UI displays the enhanced results to the user
+
+### Query Complexity Detection
+The Planning Agent uses keyword-based detection to determine query complexity:
+- Simple queries: Basic informational requests ("What", "List", "Show")
+- Complex queries: Requests for analysis, comparison, trends, patterns, insights
+
 ## Components
 
 ### 1. MCP Server (`src/mcp_server.py`)
